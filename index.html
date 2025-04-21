@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Application Tracker</title>
+</head>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Activity Tracker</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .auth-section {
+            text-align: right;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr auto;
+            gap: 10px;
+        }
+
+        .task-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        input, select, button {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .week-table th {
+            background-color: #2196F3;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        .summary {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e9f5eb;
+            border-radius: 5px;
+        }
+
+        .login-form {
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-form" id="loginForm">
+        <h2>Login</h2>
+        <div class="form-group">
+            <input type="text" id="username" placeholder="Username">
+            <input type="password" id="password" placeholder="Password">
+            <button onclick="login()" style="background-color: #4CAF50;">Login/Signup</button>
+        </div>
+    </div>
+
+    <div class="container hidden" id="mainApp">
+        <div class="auth-section">
+            <span id="loggedInUser"></span>
+            <button onclick="logout()" style="background-color: #666;">Logout</button>
+        </div>
+        
+        <h1>Weekly Activity Tracker</h1>
+        
+        <div class="task-input-group">
+            <input type="text" id="newTask" placeholder="New task name">
+            <button onclick="addNewTask()" style="background-color: #2196F3;">Add Task</button>
+        </div>
+
+        <div class="form-group">
+            <select id="task">
+                <option value="">Select Task</option>
+            </select>
+            <input type="number" id="hours" placeholder="Hours spent" step="0.5">
+            <input type="date" id="date" min="2024-04-21">
+            <button onclick="addEntry()" style="background-color: #4CAF50;">Add Entry</button>
+        </div>
+
+        <table id="entriesTable">
+            <thead>
+                <tr>
+                    <th>Task</th>
+                    <th>Hours</th>
+                    <th>Date</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="entriesBody"></tbody>
+        </table>
+
+        <div class="summary">
+            <h3>Summary</h3>
+            <div id="weeklyBreakdown"></div>
+            <div id="taskSummary"></div>
+        </div>
+
+        <button onclick="clearData()" style="margin-top: 20px; background-color: #f44336;">Clear All Data</button>
+    </div>
+
+    <script>
+        const START_DATE = new Date('2024-04-21');
+        let currentUser = null;
+        let entries = [];
+        let customTasks = [];
+
+        // Authentication functions
+        function login() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            
+            if (!username || !password) {
+                alert('Please enter both username and password');
+                return;
+            }
+
+            currentUser = username;
+            
+            // Initialize user storage
+            if (!localStorage.getItem(`tasks_${username}`)) {
+                const defaultTasks = ['Job Applications', 'Coding Practice', 'Gym Hours'];
+                localStorage.setItem(`tasks_${username}`, JSON.stringify(defaultTasks));
+            }
+            
+            // Load user data
+            entries = JSON.parse(localStorage.getItem(`entries_${username}`)) || [];
+            customTasks = JSON.parse(localStorage.getItem(`tasks_${username}`));
+            localStorage.setItem(`pwd_${username}`, password);
+            
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            document.getElementById('loggedInUser').textContent = `Logged in as: ${username}`;
+            populateTasks();
+            updateDisplay();
+        }
+
+        function logout() {
+            localStorage.setItem(`entries_${currentUser}`, JSON.stringify(entries));
+            localStorage.setItem(`tasks_${currentUser}`, JSON.stringify(customTasks));
+            
+            currentUser = null;
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        }
+
+        // Task management
+        function addNewTask() {
+            const newTask = document.getElementById('newTask').value.trim();
+            if (!newTask) {
+                alert('Please enter a task name');
+                return;
+            }
+            
+            if (!customTasks.includes(newTask)) {
+                customTasks.push(newTask);
+                localStorage.setItem(`tasks_${currentUser}`, JSON.stringify(customTasks));
+                populateTasks();
+                document.getElementById('newTask').value = '';
+            }
+        }
+
+        function populateTasks() {
+            const taskSelect = document.getElementById('task');
+            taskSelect.innerHTML = '<option value="">Select Task</option>';
+            customTasks.forEach(task => {
+                taskSelect.innerHTML += `<option value="${task}">${task}</option>`;
+            });
+        }
+
+        // Entry management
+        function addEntry() {
+            const task = document.getElementById('task').value;
+            const hours = parseFloat(document.getElementById('hours').value);
+            const date = document.getElementById('date').value;
+
+            if (!task || isNaN(hours) || !date) {
+                alert('Please fill all fields');
+                return;
+            }
+
+            entries.push({ task, hours, date });
+            localStorage.setItem(`entries_${currentUser}`, JSON.stringify(entries));
+            updateDisplay();
+            clearForm();
+        }
+
+        function deleteEntry(index) {
+            entries.splice(index, 1);
+            localStorage.setItem(`entries_${currentUser}`, JSON.stringify(entries));
+            updateDisplay();
+        }
+
+        function clearData() {
+            if (confirm('Are you sure you want to delete all data?')) {
+                localStorage.removeItem(`entries_${currentUser}`);
+                entries = [];
+                updateDisplay();
+            }
+        }
+
+        function clearForm() {
+            document.getElementById('task').value = '';
+            document.getElementById('hours').value = '';
+            document.getElementById('date').value = '';
+        }
+
+        // Display functions
+        function updateDisplay() {
+            const tbody = document.getElementById('entriesBody');
+            tbody.innerHTML = '';
+            
+            entries.forEach((entry, index) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${entry.task}</td>
+                        <td>${entry.hours}</td>
+                        <td>${new Date(entry.date).toLocaleDateString()}</td>
+                        <td><button onclick="deleteEntry(${index})" style="background-color: #f44336;">Delete</button></td>
+                    </tr>
+                `;
+            });
+
+            updateSummary();
+        }
+
+        function getWeekRange(date) {
+            const diffDays = Math.floor((new Date(date) - START_DATE) / (1000 * 60 * 60 * 24));
+            const weekNum = Math.floor(diffDays / 7) + 1;
+            const weekStart = new Date(START_DATE);
+            weekStart.setDate(START_DATE.getDate() + (weekNum - 1) * 7);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+            return {
+                range: `${weekStart.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})} - ${weekEnd.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}`,
+                weekNum: weekNum
+            };
+        }
+
+        function updateSummary() {
+            const weekMap = {};
+            const taskSummary = {};
+            const allTasks = new Set();
+            
+            entries.forEach(entry => {
+                const week = getWeekRange(entry.date).range;
+                const task = entry.task;
+                
+                if (!weekMap[week]) {
+                    weekMap[week] = { total: 0, tasks: {} };
+                }
+                weekMap[week].total += entry.hours;
+                weekMap[week].tasks[task] = (weekMap[week].tasks[task] || 0) + entry.hours;
+                
+                taskSummary[task] = (taskSummary[task] || 0) + entry.hours;
+                allTasks.add(task);
+            });
+
+            // Weekly breakdown
+            let breakdownHTML = '<h4>Weekly Breakdown</h4><table class="week-table"><thead><tr><th>Week</th>';
+            Array.from(allTasks).forEach(task => breakdownHTML += `<th>${task}</th>`);
+            breakdownHTML += '<th>Total</th></tr></thead><tbody>';
+            
+            Object.keys(weekMap).sort((a, b) => {
+                const weekA = getWeekRange(a.split(' - ')[0]).weekNum;
+                const weekB = getWeekRange(b.split(' - ')[0]).weekNum;
+                return weekA - weekB;
+            }).forEach(week => {
+                breakdownHTML += `<tr><td>${week}</td>`;
+                Array.from(allTasks).forEach(task => {
+                    breakdownHTML += `<td>${(weekMap[week].tasks[task] || 0).toFixed(1)}</td>`;
+                });
+                breakdownHTML += `<td>${weekMap[week].total.toFixed(1)}</td></tr>`;
+            });
+            
+            breakdownHTML += '</tbody></table>';
+            document.getElementById('weeklyBreakdown').innerHTML = breakdownHTML;
+
+            // Task summary
+            document.getElementById('taskSummary').innerHTML = '<h4>Task Totals:</h4>' + 
+                Object.entries(taskSummary).map(([task, total]) => 
+                    `${task}: ${total.toFixed(1)} hours`).join('<br>');
+        }
+
+        // Initialize
+        if (localStorage.getItem('entries_guest')) {
+            entries = JSON.parse(localStorage.getItem('entries_guest'));
+        }
+    </script>
+</body>
+</html>
